@@ -50,8 +50,9 @@ const TEST_MAP = `
 
 func TestParseMapString(t *testing.T) {
 	var (
-		m   *Map
-		err error
+		m     *Map
+		tiles []Tile
+		err   error
 	)
 	if m, err = ParseMapString(TEST_MAP); err != nil {
 		t.Errorf("Could not parse: %v", err)
@@ -133,5 +134,14 @@ func TestParseMapString(t *testing.T) {
 	}
 	if m.Layers[0].Data.Contents()[0:10] != "eJzt2MsKwj" {
 		t.Errorf("Invalid data string: %v", m.Layers[0].Data.Contents()[0:10])
+	}
+	if tiles, err = m.Layers[1].Data.Tiles(); err != nil {
+		t.Fatalf("Invalid tiles: %v", err)
+	}
+	if len(tiles) != 2840 {
+		t.Errorf("Invalid tiles length: %v", len(tiles))
+	}
+	if tiles[10].Gid != 65 {
+		t.Errorf("Invalid tile gid: %v", tiles[9].Gid)
 	}
 }

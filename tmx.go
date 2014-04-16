@@ -15,7 +15,15 @@
 package tmxgo
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/xml"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"strings"
 )
 
@@ -55,8 +63,10 @@ type Map struct {
 	Layers []Layer `xml:"layer"`
 
 	// Can contain objectgroup.
+	ObjectGroups []ObjectGroup `xml:"objectgroup"`
 
 	// Can contain imagelayer.
+	ImageLayers []ImageLayer `xml:"imagelayer"`
 }
 
 type Tileset struct {
@@ -244,13 +254,74 @@ type Data struct {
 	Compression string `xml:"compression,attr"`
 
 	// Can contain tile.
-	Tiles []Tile `xml:"tile"`
+	RawTiles []Tile `xml:"tile"`
 
 	RawContents string `xml:",chardata"`
 }
 
 func (d *Data) Contents() string {
 	return strings.TrimSpace(d.RawContents)
+}
+
+func (d *Data) base64Tiles() (tiles []Tile, err error) {
+	var (
+		data  []byte
+		buf   *bytes.Reader
+		r     io.ReadCloser
+		count int32
+		gids  []int32
+	)
+	if data, err = base64.StdEncoding.DecodeString(d.Contents()); err != nil {
+		return
+	}
+	switch d.Compression {
+	case "gzip":
+		buf = bytes.NewReader(data)
+		if r, err = gzip.NewReader(buf); err != nil {
+			return
+		}
+		defer r.Close()
+		if data, err = ioutil.ReadAll(r); err != nil {
+			return
+		}
+	case "zlib":
+		buf = bytes.NewReader(data)
+		if r, err = zlib.NewReader(buf); err != nil {
+			return
+		}
+		defer r.Close()
+		if data, err = ioutil.ReadAll(r); err != nil {
+			return
+		}
+	}
+	buf = bytes.NewReader(data)
+	count = int32(len(data) / binary.Size(count))
+	gids = make([]int32, count)
+	if err = binary.Read(buf, binary.LittleEndian, &gids); err != nil {
+		return
+	}
+	tiles = make([]Tile, count)
+	for i := 0; i < len(tiles); i++ {
+		tiles[i].Gid = gids[i]
+	}
+	return
+}
+
+func (d *Data) csvTiles() (tiles []Tile, err error) {
+	err = fmt.Errorf("Not implemented")
+	return
+}
+
+func (d *Data) Tiles() (tiles []Tile, err error) {
+	switch d.Encoding {
+	case "base64":
+		tiles, err = d.base64Tiles()
+	case "csv":
+		tiles, err = d.csvTiles()
+	default:
+		tiles = d.RawTiles
+	}
+	return
 }
 
 // Not to be confused with the tile element inside a tileset,
@@ -260,6 +331,146 @@ func (d *Data) Contents() string {
 type Tile struct {
 	// The global tile ID.
 	Gid int32 `xml:"gid,attr"`
+}
+
+// The object group is in fact a map layer,
+// and is hence called "object layer" in Tiled Qt.
+type ObjectGroup struct {
+	// The name of the object group.
+	Name string `xml:"name,attr"`
+
+	// The color used to display the objects in this group.
+	Color string `xml:"color,attr"`
+
+	// The x coordinate of the object group in tiles.
+	// Defaults to 0 and can no longer be changed in Tiled Qt.
+	X int32 `xml:"x,attr"`
+
+	// The y coordinate of the object group in tiles.
+	// Defaults to 0 and can no longer be changed in Tiled Qt.
+	Y int32 `xml:"y,attr"`
+
+	// The width of the object group in tiles. Meaningless.
+	Width int32 `xml:"width,attr"`
+
+	// The height of the object group in tiles. Meaningless.
+	Height int32 `xml:"height,attr"`
+
+	// The opacity of the layer as a value from 0 to 1. Defaults to 1.
+	Opacity float32 `xml:"opacity,attr"`
+
+	// Whether the layer is shown (1) or hidden (0). Defaults to 1.
+	Visible bool `xml:"visible,attr"`
+
+	// Can contain properties.
+	Properties []Property `xml:"properties>property"`
+
+	// Can contain object.
+	Objects []Object `xml:"object"`
+}
+
+// While tile layers are very suitable for anything repetitive
+// aligned to the tile grid, sometimes you want to annotate
+// your map with other information, not necessarily aligned to
+// the grid. Hence the objects have their coordinates and size in
+// pixels, but you can still easily align that to the grid when you want to.
+//
+// You generally use objects to add custom information to your
+// tile map, such as spawn points, warps, exits, etc.
+//
+// When the object has a gid set, then it is represented by the
+// image of the tile with that global ID. Currently that means width
+// and height are ignored for such objects. The image alignment
+// currently depends on the map orientation. In orthogonal orientation
+// it's aligned to the bottom-left while in isometric it's aligned
+// to the bottom-center.
+type Object struct {
+	// name: The name of the object. An arbitrary string.
+	Name string `xml:"name,attr"`
+
+	// type: The type of the object. An arbitrary string.
+	Type string `xml:"type,attr"`
+
+	// x: The x coordinate of the object in pixels.
+	X int32 `xml:"x,attr"`
+
+	// y: The y coordinate of the object in pixels.
+	Y int32 `xml:"y,attr"`
+
+	// width: The width of the object in pixels (defaults to 0).
+	Width int32 `xml:"width,attr"`
+
+	// height: The height of the object in pixels (defaults to 0).
+	Height int32 `xml:"height,attr"`
+
+	// rotation: The rotation of the object in degrees clockwise
+	// (defaults to 0). (on git master)
+	Rotation int32 `xml:"rotation,attr"`
+
+	// gid: An reference to a tile (optional).
+	Gid *int32 `xml:"gid,attr"`
+
+	// visible: Whether the object is shown (1) or hidden (0).
+	// Defaults to 1. (since 0.9.0)
+	Visible bool `xml:"visible,attr"`
+
+	// Can contain properties.
+	Properties []Property `xml:"properties>property"`
+
+	// Can contain ellipse (since 0.9.0).
+	Ellipse *Ellipse `xml:"ellipse"`
+
+	// Can contain polygon.
+	Polygon *Polygon `xml:"polygon"`
+
+	// Can contain polyline.
+	Polyline *Polyline `xml:"polyline"`
+
+	// Can contain image.
+	Image *Image `xml:"image"`
+}
+
+// Used to mark an object as an ellipse.
+// The regular x, y, width, height attributes are used to
+// determine the size of the ellipse.
+type Ellipse struct{}
+
+// Each polygon object is made up of a space-delimited list of x,y coordinates.
+// The origin for these coordinates is the location of the parent object.
+// By default, the first point is created as 0,0 denoting that the point
+// will originate exactly where the object is placed.
+type Polygon struct {
+	RawPoints string `xml:"points,attr"`
+}
+
+// A polyline follows the same placement definition as a polygon object.
+type Polyline struct {
+	RawPoints string `xml:"points,attr"`
+}
+
+// A layer consisting of a single image.
+type ImageLayer struct {
+	// The name of the image layer.
+	Name string `xml:"name,attr"`
+
+	// The width of the image layer in tiles. Meaningless.
+	Width int32 `xml:"width,attr"`
+
+	// The height of the image layer in tiles. Meaningless.
+	Height int32 `xml:"height,attr"`
+
+	// opacity: The opacity of the layer as a value from 0 to 1.
+	// Defaults to 1.
+	Opacity float32 `xml:"opacity,attr"`
+
+	// Whether the layer is shown (1) or hidden (0). Defaults to 1.
+	Visible bool `xml:"visible,attr"`
+
+	// Can contain properties.
+	Properties []Property `xml:"properties>property"`
+
+	// Can contain image.
+	Image *Image `xml:"image"`
 }
 
 // When the property spans contains newlines, the current versions
