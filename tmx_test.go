@@ -15,6 +15,7 @@
 package tmxgo
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -48,10 +49,154 @@ const TEST_MAP = `
 </map>
 `
 
-func TestParseMapString(t *testing.T) {
+const TEST_TILES_FROM_LAYER_MAP = `
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="2" height="2" tilewidth="16" tileheight="16">
+ <tileset firstgid="1" name="sprites1" tilewidth="16" tileheight="16">
+  <image source="../textures/sprites1.png" width="64" height="16"/>
+ </tileset>
+ <tileset firstgid="5" name="sprites2" tilewidth="16" tileheight="16">
+  <image source="../textures/sprites2.png" width="64" height="16"/>
+ </tileset>
+ <layer name="layer1" width="2" height="2">
+  <data>
+   <tile gid="1" />
+   <tile gid="5" />
+   <tile gid="2" />
+   <tile gid="6" />
+  </data>
+ </layer>
+ <layer name="layer2" width="2" height="2">
+  <data>
+   <tile gid="2147483649" />
+   <tile gid="1073741827" />
+   <tile gid="536870916" />
+   <tile gid="2684354574" />
+  </data>
+ </layer>
+</map>
+`
+
+func TestParseGid(t *testing.T) {
+	var (
+		val uint32
+		fh  bool
+		fv  bool
+		fd  bool
+		id  uint32
+	)
+	type testcase struct {
+		Input string
+		Id    uint32
+		Fh    bool
+		Fv    bool
+		Fd    bool
+	}
+	tests := []testcase{
+		testcase{"10000000000000000000000000000001", 1, true, false, false},
+		testcase{"01000000000000000000000000000011", 3, false, true, false},
+		testcase{"00100000000000000000000000000100", 4, false, false, true},
+		testcase{"10100000000000000000000000001110", 14, true, false, true},
+	}
+	for i := 0; i < len(tests); i++ {
+		c := tests[i]
+		if _, err := fmt.Sscanf(c.Input, "%b", &val); err != nil {
+			t.Fatalf("Invalid Gid: %v", err)
+		}
+		id, fh, fv, fd = parseGid(val)
+		if id != c.Id || fh != c.Fh || fv != c.Fv || fd != c.Fd {
+			t.Errorf("Gid parsed wrong: %v %v %v %v %v", id, fh, fv, fd, c)
+		}
+	}
+}
+
+func TestTilesFromLayer(t *testing.T) {
 	var (
 		m     *Map
 		tiles []Tile
+		err   error
+	)
+	if m, err = ParseMapString(TEST_TILES_FROM_LAYER_MAP); err != nil {
+		t.Errorf("Could not parse: %v", err)
+	}
+	if tiles, err = m.TilesFromLayerIndex(0); err != nil {
+		t.Fatalf("Could not get layer 0")
+	}
+	if len(tiles) != 4 {
+		t.Fatalf("Did not have enough tiles")
+	}
+	if tiles[0].Index != 0 {
+		t.Errorf("Wrong index: %v", tiles[0].Index)
+	}
+	if tiles[0].FlipHorz == true {
+		t.Errorf("FlipHorz parsed incorrectly")
+	}
+	if tiles[1].Index != 0 {
+		t.Errorf("Wrong index: %v", tiles[1].Index)
+	}
+	if tiles[1].FlipVert == true {
+		t.Errorf("FlipVert parsed incorrectly")
+	}
+	if tiles[2].Index != 1 {
+		t.Errorf("Wrong index: %v", tiles[2].Index)
+	}
+	if tiles[2].FlipDiag == true {
+		t.Errorf("FlipDiag parsed incorrectly")
+	}
+	if tiles[3].Index != 1 {
+		t.Errorf("Wrong index: %v", tiles[3].Index)
+	}
+	if tiles[3].FlipHorz == true || tiles[3].FlipDiag == true {
+		t.Errorf("FlipHorz & FlipDiag parsed incorrectly")
+	}
+	if tiles, err = m.TilesFromLayerName("layer2"); err != nil {
+		t.Fatalf("Could not get layer 'layer2'")
+	}
+	if len(tiles) != 4 {
+		t.Fatalf("Did not have enough tiles")
+	}
+	if tiles[0].Index != 1-1 {
+		t.Errorf("Wrong index: %v", tiles[0].Index)
+	}
+	if tiles[0].FlipHorz == false {
+		t.Errorf("FlipHorz parsed incorrectly")
+	}
+	if tiles[1].Index != 3-1 {
+		t.Errorf("Wrong index: %v", tiles[1].Index)
+	}
+	if tiles[1].FlipVert == false {
+		t.Errorf("FlipVert parsed incorrectly")
+	}
+	if tiles[2].Index != 4-1 {
+		t.Errorf("Wrong index: %v", tiles[2].Index)
+	}
+	if tiles[2].FlipDiag == false {
+		t.Errorf("FlipDiag parsed incorrectly")
+	}
+	if tiles[3].Index != 14-5 {
+		t.Errorf("Wrong index: %v", tiles[3].Index)
+	}
+	if tiles[3].FlipHorz == false || tiles[3].FlipDiag == false {
+		t.Errorf("FlipHorz & FlipDiag parsed incorrectly")
+	}
+	if tiles[0].Tileset.Name != "sprites1" {
+		t.Errorf("Invalid tileset: %v", tiles[0].Tileset.Name)
+	}
+	if tiles[1].Tileset.Name != "sprites1" {
+		t.Errorf("Invalid tileset: %v", tiles[1].Tileset.Name)
+	}
+	if tiles[2].Tileset.Name != "sprites1" {
+		t.Errorf("Invalid tileset: %v", tiles[2].Tileset.Name)
+	}
+	if tiles[3].Tileset.Name != "sprites2" {
+		t.Errorf("Invalid tileset: %v", tiles[3].Tileset.Name)
+	}
+}
+
+func TestParseMapString(t *testing.T) {
+	var (
+		m     *Map
+		tiles []DataTile
 		err   error
 	)
 	if m, err = ParseMapString(TEST_MAP); err != nil {

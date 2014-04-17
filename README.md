@@ -7,8 +7,6 @@ Based off of the TMX specification from <https://github.com/bjorn/tiled/wiki/TMX
 
 TODO:
 
-  * Tile flipping.
   * CSV.
   * Unit tests for full spec.
-  * Convert tile Gid to TilesetTile.
   * Enforce defaults for properties such as visible and opacity.
