@@ -70,7 +70,7 @@ type Map struct {
 	ImageLayers []ImageLayer `xml:"imagelayer"`
 }
 
-func (m *Map) TilesFromLayerName(name string) (t []Tile, err error) {
+func (m *Map) TilesFromLayerName(name string) (t []*Tile, err error) {
 	for i := 0; i < len(m.Layers); i++ {
 		if m.Layers[i].Name == name {
 			return m.tilesFromLayer(&m.Layers[i])
@@ -80,7 +80,7 @@ func (m *Map) TilesFromLayerName(name string) (t []Tile, err error) {
 	return
 }
 
-func (m *Map) TilesFromLayerIndex(index int32) (t []Tile, err error) {
+func (m *Map) TilesFromLayerIndex(index int32) (t []*Tile, err error) {
 	if index < 0 || index > int32(len(m.Layers)) {
 		err = fmt.Errorf("Index %v out of bounds", index)
 		return
@@ -88,15 +88,17 @@ func (m *Map) TilesFromLayerIndex(index int32) (t []Tile, err error) {
 	return m.tilesFromLayer(&m.Layers[index])
 }
 
-func (m *Map) tilesFromLayer(layer *Layer) (t []Tile, err error) {
+func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
 	var datatiles []DataTile
 	if datatiles, err = layer.Data.Tiles(); err != nil {
 		return
 	}
 	sort.Sort(byFirstGid(m.Tilesets)) // Should be sorted but just in case.
-	t = make([]Tile, len(datatiles))
+	t = make([]*Tile, len(datatiles))
 	for i := 0; i < len(datatiles); i++ {
-		if t[i], err = newTile(datatiles[i].Gid, m.Tilesets); err != nil {
+		if datatiles[i].Gid == 0 {
+			t[i] = nil
+		} else if t[i], err = newTile(datatiles[i].Gid, m.Tilesets); err != nil {
 			return
 		}
 	}
@@ -127,7 +129,7 @@ func parseGid(gid uint32) (id uint32, fliph, flipv, flipd bool) {
 }
 
 // The tilesets argument must first be sorted by firstgid.
-func newTile(gid uint32, tilesets []Tileset) (t Tile, err error) {
+func newTile(gid uint32, tilesets []Tileset) (t *Tile, err error) {
 	var (
 		tileset *Tileset
 		count   = len(tilesets)
@@ -149,7 +151,7 @@ func newTile(gid uint32, tilesets []Tileset) (t Tile, err error) {
 	if tileset == nil {
 		tileset = &tilesets[count-1]
 	}
-	t = Tile{
+	t = &Tile{
 		Index:    gid - tileset.FirstGid,
 		Tileset:  tileset,
 		FlipVert: flipv,

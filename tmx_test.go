@@ -61,7 +61,7 @@ const TEST_TILES_FROM_LAYER_MAP = `
  <layer name="layer1" width="2" height="2">
   <data>
    <tile gid="1" />
-   <tile gid="5" />
+   <tile gid="0" />
    <tile gid="2" />
    <tile gid="6" />
   </data>
@@ -113,7 +113,7 @@ func TestParseGid(t *testing.T) {
 func TestTilesFromLayer(t *testing.T) {
 	var (
 		m     *Map
-		tiles []Tile
+		tiles []*Tile
 		err   error
 	)
 	if m, err = ParseMapString(TEST_TILES_FROM_LAYER_MAP); err != nil {
@@ -131,11 +131,8 @@ func TestTilesFromLayer(t *testing.T) {
 	if tiles[0].FlipHorz == true {
 		t.Errorf("FlipHorz parsed incorrectly")
 	}
-	if tiles[1].Index != 0 {
-		t.Errorf("Wrong index: %v", tiles[1].Index)
-	}
-	if tiles[1].FlipVert == true {
-		t.Errorf("FlipVert parsed incorrectly")
+	if tiles[1] != nil {
+		t.Errorf("Tile not nil: %v", tiles[1])
 	}
 	if tiles[2].Index != 1 {
 		t.Errorf("Wrong index: %v", tiles[2].Index)
@@ -195,9 +192,9 @@ func TestTilesFromLayer(t *testing.T) {
 
 func TestParseMapString(t *testing.T) {
 	var (
-		m     *Map
-		tiles []DataTile
-		err   error
+		m         *Map
+		datatiles []DataTile
+		err       error
 	)
 	if m, err = ParseMapString(TEST_MAP); err != nil {
 		t.Errorf("Could not parse: %v", err)
@@ -280,13 +277,13 @@ func TestParseMapString(t *testing.T) {
 	if m.Layers[0].Data.Contents()[0:10] != "eJzt2MsKwj" {
 		t.Errorf("Invalid data string: %v", m.Layers[0].Data.Contents()[0:10])
 	}
-	if tiles, err = m.Layers[1].Data.Tiles(); err != nil {
+	if datatiles, err = m.Layers[1].Data.Tiles(); err != nil {
 		t.Fatalf("Invalid tiles: %v", err)
 	}
-	if len(tiles) != 2840 {
-		t.Errorf("Invalid tiles length: %v", len(tiles))
+	if len(datatiles) != 2840 {
+		t.Errorf("Invalid tiles length: %v", len(datatiles))
 	}
-	if tiles[10].Gid != 65 {
-		t.Errorf("Invalid tile gid: %v", tiles[9].Gid)
+	if datatiles[10].Gid != 65 {
+		t.Errorf("Invalid tile gid: %v", datatiles[9].Gid)
 	}
 }
