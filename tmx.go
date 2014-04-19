@@ -266,10 +266,10 @@ func (t *Tileset) TextureBounds(index uint32) Bounds {
 		tileshigh = t.Image.Height / t.TileHeight
 	)
 	return Bounds{
-		Y: float32((int32(index) / tileswide) * t.TileHeight / t.Image.Height),
-		X: float32((int32(index) % tileshigh) * t.TileWidth / t.Image.Width),
-		W: float32(t.TileWidth / t.Image.Width),
-		H: float32(t.TileHeight / t.Image.Height),
+		Y: float32((int32(index)/tileswide)*t.TileHeight) / float32(t.Image.Height),
+		X: float32((int32(index)%tileshigh)*t.TileWidth) / float32(t.Image.Width),
+		W: float32(t.TileWidth) / float32(t.Image.Width),
+		H: float32(t.TileHeight) / float32(t.Image.Height),
 	}
 }
 
