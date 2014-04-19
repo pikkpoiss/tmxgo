@@ -96,21 +96,37 @@ func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
 	sort.Sort(byFirstGid(m.Tilesets)) // Should be sorted but just in case.
 	t = make([]*Tile, len(datatiles))
 	for i := 0; i < len(datatiles); i++ {
-		if datatiles[i].Gid == 0 {
+		var (
+			tilebounds = Bounds{
+				Y: float32((int32(i) / layer.Width) * m.TileHeight),
+				X: float32((int32(i) % layer.Width) * m.TileWidth),
+				W: float32(m.TileWidth),
+				H: float32(m.TileHeight),
+			}
+			gid = datatiles[i].Gid
+		)
+
+		if gid == 0 {
 			t[i] = nil
-		} else if t[i], err = newTile(datatiles[i].Gid, m.Tilesets); err != nil {
+		} else if t[i], err = newTile(gid, m.Tilesets, tilebounds); err != nil {
 			return
 		}
 	}
 	return
 }
 
+type Bounds struct {
+	X, Y, W, H float32
+}
+
 type Tile struct {
-	Index    uint32
-	Tileset  *Tileset
-	FlipVert bool
-	FlipHorz bool
-	FlipDiag bool
+	Index         uint32
+	Tileset       *Tileset
+	FlipVert      bool
+	FlipHorz      bool
+	FlipDiag      bool
+	TileBounds    Bounds
+	TextureBounds Bounds
 }
 
 const (
@@ -129,13 +145,14 @@ func parseGid(gid uint32) (id uint32, fliph, flipv, flipd bool) {
 }
 
 // The tilesets argument must first be sorted by firstgid.
-func newTile(gid uint32, tilesets []Tileset) (t *Tile, err error) {
+func newTile(gid uint32, tilesets []Tileset, tilebounds Bounds) (t *Tile, err error) {
 	var (
 		tileset *Tileset
 		count   = len(tilesets)
 		fliph   bool
 		flipv   bool
 		flipd   bool
+		index   uint32
 	)
 	if count == 0 {
 		err = fmt.Errorf("No tilesets")
@@ -151,12 +168,15 @@ func newTile(gid uint32, tilesets []Tileset) (t *Tile, err error) {
 	if tileset == nil {
 		tileset = &tilesets[count-1]
 	}
+	index = gid - tileset.FirstGid
 	t = &Tile{
-		Index:    gid - tileset.FirstGid,
-		Tileset:  tileset,
-		FlipVert: flipv,
-		FlipHorz: fliph,
-		FlipDiag: flipd,
+		Index:         index,
+		Tileset:       tileset,
+		FlipVert:      flipv,
+		FlipHorz:      fliph,
+		FlipDiag:      flipd,
+		TileBounds:    tilebounds,
+		TextureBounds: tileset.TextureBounds(index),
 	}
 	return
 }
@@ -212,6 +232,22 @@ type Tileset struct {
 
 	// Can contain tile.
 	TilesetTile []TilesetTile `xml:"tile"`
+}
+
+func (t *Tileset) TextureBounds(index uint32) Bounds {
+	if t.Image == nil {
+		return Bounds{0, 0, 0, 0}
+	}
+	var (
+		tileswide = t.Image.Width / t.TileWidth
+		tileshigh = t.Image.Height / t.TileHeight
+	)
+	return Bounds{
+		Y: float32((int32(index) / tileswide) * t.TileWidth),
+		X: float32((int32(index) % tileshigh) * t.TileHeight),
+		W: float32(t.TileWidth),
+		H: float32(t.TileHeight),
+	}
 }
 
 // This element is used to specify an offset in pixels,
