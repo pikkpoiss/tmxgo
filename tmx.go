@@ -130,13 +130,19 @@ type Tile struct {
 	TextureBounds Bounds
 }
 
-func (t *Tile) Triangles() [20]float32 {
-	return [20]float32{
+func (t *Tile) Triangles() [30]float32 {
+	return [30]float32{
 		t.TileBounds.X, t.TileBounds.Y, 0.0,
 		t.TextureBounds.X, t.TextureBounds.Y,
 
+		t.TileBounds.X + t.TileBounds.H, t.TileBounds.Y + t.TileBounds.H, 0.0,
+		t.TextureBounds.X + t.TextureBounds.H, t.TextureBounds.Y + t.TextureBounds.H,
+
 		t.TileBounds.X, t.TileBounds.Y + t.TileBounds.H, 0.0,
 		t.TextureBounds.X, t.TextureBounds.Y + t.TextureBounds.H,
+
+		t.TileBounds.X, t.TileBounds.Y, 0.0,
+		t.TextureBounds.X, t.TextureBounds.Y,
 
 		t.TileBounds.X + t.TileBounds.H, t.TileBounds.Y, 0.0,
 		t.TextureBounds.X + t.TextureBounds.H, t.TextureBounds.Y,
