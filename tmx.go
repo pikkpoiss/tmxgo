@@ -97,8 +97,9 @@ func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
 	t = make([]*Tile, len(datatiles))
 	for i := 0; i < len(datatiles); i++ {
 		var (
+			mapheight  = layer.Height * m.TileHeight
 			tilebounds = Bounds{
-				Y: float32((int32(i) / layer.Width) * m.TileHeight),
+				Y: float32(mapheight - ((int32(i) / layer.Width) * m.TileHeight)),
 				X: float32((int32(i) % layer.Width) * m.TileWidth),
 				W: float32(m.TileWidth),
 				H: float32(m.TileHeight),
@@ -127,6 +128,22 @@ type Tile struct {
 	FlipDiag      bool
 	TileBounds    Bounds
 	TextureBounds Bounds
+}
+
+func (t *Tile) Triangles() []float32 {
+	return []float32{
+		t.TileBounds.X, t.TileBounds.Y, 0.0,
+		t.TextureBounds.X, t.TextureBounds.Y,
+
+		t.TileBounds.X, t.TileBounds.Y + t.TileBounds.H, 0.0,
+		t.TextureBounds.X, t.TextureBounds.Y + t.TextureBounds.H,
+
+		t.TileBounds.X + t.TileBounds.H, t.TileBounds.Y, 0.0,
+		t.TextureBounds.X + t.TextureBounds.H, t.TextureBounds.Y,
+
+		t.TileBounds.X + t.TileBounds.H, t.TileBounds.Y + t.TileBounds.H, 0.0,
+		t.TextureBounds.X + t.TextureBounds.H, t.TextureBounds.Y + t.TextureBounds.H,
+	}
 }
 
 const (
