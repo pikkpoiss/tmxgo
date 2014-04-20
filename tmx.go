@@ -99,10 +99,10 @@ func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
 		var (
 			mapheight  = layer.Height * m.TileHeight
 			tilebounds = Bounds{
-				Y: float32(mapheight - m.TileHeight - ((int32(i) / layer.Width) * m.TileHeight)),
-				X: float32((int32(i) % layer.Width) * m.TileWidth),
-				W: float32(m.TileWidth),
-				H: float32(m.TileHeight),
+				Y: float32(layer.Height - 1 - (int32(i) / layer.Width)),
+				X: float32((int32(i) % layer.Width)),
+				W: 1.0,
+				H: float32(m.TileHeight) / float32(m.TileWidth),
 			}
 			gid = datatiles[i].Gid
 		)
@@ -266,7 +266,7 @@ func (t *Tileset) TextureBounds(index uint32) Bounds {
 		tileshigh = t.Image.Height / t.TileHeight
 	)
 	return Bounds{
-		Y: float32((tileshigh - 1 - int32(index)/tileswide)*t.TileHeight) / float32(t.Image.Height),
+		Y: float32((tileshigh-1-int32(index)/tileswide)*t.TileHeight) / float32(t.Image.Height),
 		X: float32((int32(index)%tileshigh)*t.TileWidth) / float32(t.Image.Width),
 		W: float32(t.TileWidth) / float32(t.Image.Width),
 		H: float32(t.TileHeight) / float32(t.Image.Height),
