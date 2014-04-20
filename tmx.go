@@ -203,7 +203,7 @@ func newTile(gid uint32, tilesets []Tileset, tilebounds Bounds) (t *Tile, err er
 	return
 }
 
-func GetTexturePath(tiles []*tmxgo.Tile) (path string, err error) {
+func GetTexturePath(tiles []*Tile) (path string, err error) {
 	for i := 0; i < len(tiles); i++ {
 		if tiles[i] == nil {
 			continue
