@@ -203,6 +203,24 @@ func newTile(gid uint32, tilesets []Tileset, tilebounds Bounds) (t *Tile, err er
 	return
 }
 
+func GetTexturePath(tiles []*tmxgo.Tile) (path string, err error) {
+	for i := 0; i < len(tiles); i++ {
+		if tiles[i] == nil {
+			continue
+		}
+		if tiles[i].Tileset == nil {
+			continue
+		}
+		if tiles[i].Tileset.Image == nil {
+			continue
+		}
+		path = tiles[i].Tileset.Image.Source
+		return
+	}
+	err = fmt.Errorf("Could not find suitable tileset")
+	return
+}
+
 // Sorts Tilesets by FirstGid property.
 type byFirstGid []Tileset
 
