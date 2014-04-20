@@ -97,7 +97,6 @@ func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
 	t = make([]*Tile, len(datatiles))
 	for i := 0; i < len(datatiles); i++ {
 		var (
-			mapheight  = layer.Height * m.TileHeight
 			tilebounds = Bounds{
 				Y: float32(layer.Height - 1 - (int32(i) / layer.Width)),
 				X: float32((int32(i) % layer.Width)),
