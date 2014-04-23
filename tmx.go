@@ -119,6 +119,10 @@ type Bounds struct {
 	X, Y, W, H float32
 }
 
+func (b Bounds) GetScaled(rx, ry float32) (x, y, w, h float32) {
+	return b.X / rx, b.Y / ry, b.W / rx, b.H / ry
+}
+
 type Tile struct {
 	Index         uint32
 	Tileset       *Tileset
@@ -129,26 +133,12 @@ type Tile struct {
 	TextureBounds Bounds
 }
 
-func (t *Tile) Triangles() [30]float32 {
-	return [30]float32{
-		t.TileBounds.X, t.TileBounds.Y, 0.0,
-		t.TextureBounds.X, t.TextureBounds.Y,
+func (t *Tile) ScaledBounds(ratio float32) (x, y, w, h float32) {
+	return t.TileBounds.GetScaled(ratio, ratio)
+}
 
-		t.TileBounds.X + t.TileBounds.H, t.TileBounds.Y + t.TileBounds.H, 0.0,
-		t.TextureBounds.X + t.TextureBounds.H, t.TextureBounds.Y + t.TextureBounds.H,
-
-		t.TileBounds.X, t.TileBounds.Y + t.TileBounds.H, 0.0,
-		t.TextureBounds.X, t.TextureBounds.Y + t.TextureBounds.H,
-
-		t.TileBounds.X, t.TileBounds.Y, 0.0,
-		t.TextureBounds.X, t.TextureBounds.Y,
-
-		t.TileBounds.X + t.TileBounds.H, t.TileBounds.Y, 0.0,
-		t.TextureBounds.X + t.TextureBounds.H, t.TextureBounds.Y,
-
-		t.TileBounds.X + t.TileBounds.H, t.TileBounds.Y + t.TileBounds.H, 0.0,
-		t.TextureBounds.X + t.TextureBounds.H, t.TextureBounds.Y + t.TextureBounds.H,
-	}
+func (t *Tile) ScaledTextureBounds(texw, texh float32) (x, y, w, h float32) {
+	return t.TextureBounds.GetScaled(texw, texh)
 }
 
 const (
