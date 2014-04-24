@@ -70,22 +70,40 @@ type Map struct {
 	ImageLayers []ImageLayer `xml:"imagelayer"`
 }
 
-func (m *Map) TilesFromLayerName(name string) (t []*Tile, err error) {
+func (m *Map) LayerByName(name string) (l *Layer, err error) {
 	for i := 0; i < len(m.Layers); i++ {
 		if m.Layers[i].Name == name {
-			return m.tilesFromLayer(&m.Layers[i])
+			l = &m.Layers[i]
+			return
 		}
 	}
 	err = fmt.Errorf("No layer with name %v", name)
 	return
 }
 
-func (m *Map) TilesFromLayerIndex(index int32) (t []*Tile, err error) {
+func (m *Map) LayerByIndex(index int32) (l *Layer, err error) {
 	if index < 0 || index > int32(len(m.Layers)) {
 		err = fmt.Errorf("Index %v out of bounds", index)
 		return
 	}
-	return m.tilesFromLayer(&m.Layers[index])
+	l = &m.Layers[index]
+	return
+}
+
+func (m *Map) TilesFromLayerName(name string) (t []*Tile, err error) {
+	var layer *Layer
+	if layer, err = m.LayerByName(name); err != nil {
+		return
+	}
+	return m.tilesFromLayer(layer)
+}
+
+func (m *Map) TilesFromLayerIndex(index int32) (t []*Tile, err error) {
+	var layer *Layer
+	if layer, err = m.LayerByIndex(index); err != nil {
+		return
+	}
+	return m.tilesFromLayer(layer)
 }
 
 func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
