@@ -17,3 +17,7 @@ TODO:
 
   * Support CSV encoding.
   * Unit tests for full spec.
+
+## Documentation
+
+<https://godoc.org/github.com/kurrik/tmxgo>
