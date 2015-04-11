@@ -16,6 +16,7 @@ package tmxgo
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -46,6 +47,32 @@ const TEST_MAP = `
    eJztl1sOhTAIRN2auv89Gf9MbC0FLK85n1dvAjNTsNtGYyf+lpXDugBjLPof5av3nFNrdX+jIfELXv8HZyec6lWsI3KWqLpn2vOR/brheMHtecW5bNWWKW/WQEuQGeS7Hqt3+HMPIm+gCpHvZeBNa3ZFvw9VADtHj56WvVmHGegPynnAXPMPPAKrQeb84fn7Rrs2z71qk7FXSU8zsyejdtZQ9R+9x/XGytNsWaqyw73cPb/0pmYrumfZztAIrq8zOkkzIfm/l7MVGYqGFwJPD+s=
   </data>
  </layer>
+</map>
+`
+
+const TEST_MAP_ENCODED = `
+<?xml version="1.0" encoding="UTF-8"?>
+<map version="1.0" orientation="orthogonal" width="71" height="40" tilewidth="16" tileheight="16">
+  <properties>
+    <property name="time1" value="16"></property>
+    <property name="time2" value="9"></property>
+    <property name="time3" value="6"></property>
+  </properties>
+  <tileset firstgid="1" name="sprites32" tilewidth="32" tileheight="32">
+    <image source="../textures/sprites32.png" width="512" height="64"></image>
+  </tileset>
+  <tileset firstgid="33" name="sprites16" tilewidth="16" tileheight="16">
+    <image source="../textures/sprites16.png" width="256" height="32"></image>
+  </tileset>
+  <tileset firstgid="65" name="stars" tilewidth="16" tileheight="16">
+    <image source="../textures/stars.png" width="64" height="16"></image>
+  </tileset>
+  <layer name="Tile Layer 3" width="71" height="40">
+    <data encoding="base64" compression="zlib">eJzs2E0KAjEMxXEFL+LOz8Xc/3J24cIRUwImJE3+Pyi4EInPzvQ5B6Cxy1j36CGSeoz1jB4iqSrZWO3/7eN1lWxuY12NP7NKNh488kZvW/QATk7RAyAlq/0e1YuPyvdFXtec4TKy2avYiz2QjYxe7Ov8Xv+q+CzJKpvvPbxKf53NaZVNRVWzqXiNW+EMl5HNHr1Yh2xkq/TiX88qOEdkq/yuyG2V/xgVdLyfab9zxzNcew/vmM0MvViHbGT0J2TxCgAA//9YsQ1i</data>
+  </layer>
+  <layer name="Stars" width="71" height="40">
+    <data encoding="base64" compression="zlib">eJzsl10SAjEIg72aev87Ob4549ZSQH5CvkfdnYEkhe1NyF34GyqP7AKSyeh/l6/V/5pap/vbDYtf9Pp/aHbC072KODpnSao70p7v7NcbjRfaniPO5VVtSHnLhloSZJjveUTv8M89yLyRKXS+l5FvrmZX9/vQBLhz/FhpuZp1nIH1kJwHzrX60CMSDTNXj8rfN961Ve7VG8ReLT2dzB5E7bKR6r97TutNlqdoWZqyw6vcPX/pLc1Wd8/QztAOra8nOlkzYXm/ytnqjETDVwAAAP//Ak8P6w==</data>
+  </layer>
 </map>
 `
 
@@ -300,7 +327,7 @@ func TestMapSerialize(t *testing.T) {
 	if serialized, err = m.Serialize(); err != nil {
 		t.Fatalf("Could not reserialize: %v", err)
 	}
-	if serialized != TEST_MAP {
+	if strings.TrimSpace(serialized) != strings.TrimSpace(TEST_MAP_ENCODED) {
 		t.Errorf("Serialized data did not match expected value!. Got \n%v", serialized)
 	}
 }

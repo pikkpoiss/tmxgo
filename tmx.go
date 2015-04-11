@@ -25,6 +25,7 @@ import (
 	"io"
 	"io/ioutil"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -32,6 +33,8 @@ import (
 // size of the map. The individual tiles may have different sizes.
 // Larger tiles will extend at the top and right (anchored to the bottom left).
 type Map struct {
+	XMLName xml.Name `xml:map`
+
 	// The TMX format version, generally 1.0.
 	Version string `xml:"version,attr"`
 
@@ -52,7 +55,7 @@ type Map struct {
 	TileHeight int32 `xml:"tileheight,attr"`
 
 	// The background color of the map. (since 0.9.0).
-	BackgroundColor string `xml:"backgroundcolor,attr"`
+	BackgroundColor string `xml:"backgroundcolor,attr,omitempty"`
 
 	// Can contain properties.
 	Properties []Property `xml:"properties>property"`
@@ -133,6 +136,24 @@ func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
 	return
 }
 
+func (m *Map) afterDeserialize() (err error) {
+	for i := 0; i < len(m.Layers); i++ {
+		if err = m.Layers[i].afterDeserialize(); err != nil {
+			return
+		}
+	}
+	return
+}
+
+func (m *Map) beforeSerialize() (err error) {
+	for i := 0; i < len(m.Layers); i++ {
+		if err = m.Layers[i].beforeSerialize(); err != nil {
+			return
+		}
+	}
+	return
+}
+
 type Bounds struct {
 	X, Y, W, H float32
 }
@@ -171,6 +192,20 @@ func parseGid(gid uint32) (id uint32, fliph, flipv, flipd bool) {
 	flipv = (gid & FLIPPED_V_FLAG) > 0
 	flipd = (gid & FLIPPED_D_FLAG) > 0
 	id = gid & ^CLEAR_FLIP
+	return
+}
+
+func encodeGid(id uint32, fliph, flipv, flipd bool) (gid uint32) {
+	gid = id
+	if fliph {
+		gid |= FLIPPED_H_FLAG
+	}
+	if flipv {
+		gid |= FLIPPED_V_FLAG
+	}
+	if flipd {
+		gid |= FLIPPED_D_FLAG
+	}
 	return
 }
 
@@ -247,7 +282,7 @@ type Tileset struct {
 	// (There is the firstgid attribute missing and this source
 	// attribute is also not there. These two attributes are kept
 	// in the TMX map, since they are map specific.)
-	Source string `xml:"source,attr"`
+	Source string `xml:"source,attr,omitempty"`
 
 	// The name of this tileset.
 	Name string `xml:"name,attr"`
@@ -260,26 +295,26 @@ type Tileset struct {
 
 	// The spacing in pixels between the tiles in this tileset.
 	// (applies to the tileset image).
-	Spacing int32 `xml:"spacing,attr"`
+	Spacing int32 `xml:"spacing,attr,omitempty"`
 
 	// The margin around the tiles in this tileset.
 	// (applies to the tileset image).
-	Margin int32 `xml:"margin,attr"`
+	Margin int32 `xml:"margin,attr,omitempty"`
 
 	// Can contain tileoffset (since 0.8.0).
 	TileOffset *TileOffset `xml:"tileoffset"`
 
 	// Can contain properties (since 0.8.0).
-	Properties []Property `xml:"properties>property"`
+	Properties []Property `xml:"properties,omitempty>property"`
 
 	// Can contain image.
 	Image *Image `xml:"image"`
 
 	// Can contain terraintypes (since 0.9.0).
-	TerrainTypes []Terrain `xml:"terraintypes>terrain"`
+	TerrainTypes []Terrain `xml:"terraintypes,omitempty>terrain"`
 
 	// Can contain tile.
-	TilesetTile []TilesetTile `xml:"tile"`
+	TilesetTile []TilesetTile `xml:"tile,omitempty"`
 }
 
 func (t *Tileset) TextureBounds(index uint32) Bounds {
@@ -317,11 +352,11 @@ type TileOffset struct {
 type Image struct {
 	// Used for embedded images, in combination with a data child element.
 	// (since 0.9.0)
-	Format string `xml:"format,attr"`
+	Format string `xml:"format,attr,omitempty"`
 
 	// Used by some versions of Tiled Java.
 	// Deprecated and unsupported by Tiled Qt.
-	Id int32 `xml:"id,attr"`
+	Id int32 `xml:"id,attr,omitempty"`
 
 	// The reference to the tileset image file.
 	// (Tiled supports most common image formats).
@@ -329,7 +364,7 @@ type Image struct {
 
 	// Defines a specific color that is treated as transparent.
 	// (example value: "FF00FF" for magenta).
-	Trans string `xml:"trans,attr"`
+	Trans string `xml:"trans,attr,omitempty"`
 
 	//The image width in pixels.
 	// (optional, used for tile index correction when the image changes).
@@ -384,11 +419,11 @@ type Layer struct {
 
 	// The x coordinate of the layer in tiles. Defaults to 0 and
 	// can no longer be changed in Tiled Qt.
-	X int32 `xml:"x,attr"`
+	X int32 `xml:"x,attr,omitempty"`
 
 	// The y coordinate of the layer in tiles. Defaults to 0 and
 	// can no longer be changed in Tiled Qt.
-	Y int32 `xml:"y,attr"`
+	Y int32 `xml:"y,attr,omitempty"`
 
 	// The width of the layer in tiles. Traditionally required, but
 	// as of Tiled Qt always the same as the map width.
@@ -399,16 +434,59 @@ type Layer struct {
 	Height int32 `xml:"height,attr"`
 
 	// The opacity of the layer as a value from 0 to 1. Defaults to 1.
-	Opacity float32 `xml:"opacity,attr"`
+	opacity string `xml:"opacity,attr"`
+	Opacity float32 `xml:"-"`
 
 	// Whether the layer is shown (1) or hidden (0). Defaults to 1.
-	Visible bool `xml:"visible,attr"`
+	visible string `xml:"visible,attr"`
+	Visible bool `xml:"-"`
 
 	// Can contain properties.
-	Properties []Property `xml:"properties>property"`
+	Properties []Property `xml:"properties,omitempty>property"`
 
 	// Can contain data.
 	Data *Data `xml:"data"`
+}
+
+func (l Layer) afterDeserialize() (err error) {
+	var (
+		f float64
+		i int64
+	)
+	if l.opacity != "" {
+		if f, err = strconv.ParseFloat(l.opacity, 32); err != nil {
+			return
+		}
+		l.Opacity = float32(f)
+	} else {
+		l.Opacity = 1.0
+	}
+	if l.visible != "" {
+		if i, err = strconv.ParseInt(l.visible, 10, 32); err != nil {
+			return
+		}
+		l.Visible = (i > 0)
+	} else {
+		l.Visible = true
+	}
+	return
+}
+
+func (l Layer) beforeSerialize() (err error) {
+	var (
+		grid DataTileGrid
+	)
+	if l.Visible {
+		l.visible = "1"
+	} else {
+		l.visible = "0"
+	}
+	l.opacity = strconv.FormatFloat(float64(l.Opacity), 'f', 10, 32)
+	if grid, err = l.Data.GetTileGrid(int(l.Width), int(l.Height)); err != nil {
+		return
+	}
+	err = l.Data.SetTileGrid(grid)
+	return
 }
 
 // When no encoding or compression is given, the tiles are stored as
@@ -507,6 +585,74 @@ func (d *Data) Tiles() (tiles []DataTile, err error) {
 	return
 }
 
+func (d *Data) GetTileGrid(width, height int) (grid DataTileGrid, err error) {
+	var (
+		tiles []DataTile
+	)
+	if tiles, err = d.Tiles(); err != nil {
+		return
+	}
+	if len(tiles) != width*height {
+		err = fmt.Errorf(
+			"Tile length %v didn't match width x height (%v,%v)",
+			len(tiles), width, height)
+		return
+	}
+	grid = DataTileGrid{
+		Width:  width,
+		Height: height,
+		Tiles:  make([][]DataTileGridTile, width),
+	}
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			if y == 0 {
+				grid.Tiles[x] = make([]DataTileGridTile, height)
+			}
+			var id, flipX, flipY, flipD = parseGid(tiles[width*y+x].Gid)
+			grid.Tiles[x][y] = DataTileGridTile{
+				Id:    id,
+				FlipX: flipX,
+				FlipY: flipY,
+				FlipD: flipD,
+			}
+		}
+	}
+	return
+}
+
+func (d *Data) SetTileGrid(grid DataTileGrid) (err error) {
+	var (
+		buf        bytes.Buffer
+		b64Encoder io.WriteCloser
+		zlibWriter *zlib.Writer
+		gids       []uint32
+		gridTile   DataTileGridTile
+	)
+	d.Encoding = "base64"
+	d.Compression = "zlib"
+	d.RawTiles = []DataTile{}
+	gids = make([]uint32, grid.Width*grid.Height)
+	for y := 0; y < grid.Height; y++ {
+		for x := 0; x < grid.Width; x++ {
+			gridTile = grid.Tiles[x][y]
+			gids[grid.Width*y+x] = encodeGid(
+				gridTile.Id,
+				gridTile.FlipX,
+				gridTile.FlipY,
+				gridTile.FlipD)
+		}
+	}
+	b64Encoder = base64.NewEncoder(base64.StdEncoding, &buf)
+	zlibWriter = zlib.NewWriter(b64Encoder)
+	if err = binary.Write(zlibWriter, binary.LittleEndian, gids); err != nil {
+		return
+	}
+	zlibWriter.Close()
+	b64Encoder.Close()
+	d.RawContents = buf.String()
+	return
+}
+
 // Not to be confused with the tile element inside a tileset,
 // this element defines the value of a single tile on a tile layer.
 // This is however the most inefficient way of storing the tile layer data,
@@ -514,6 +660,19 @@ func (d *Data) Tiles() (tiles []DataTile, err error) {
 type DataTile struct {
 	// The global tile ID.
 	Gid uint32 `xml:"gid,attr"`
+}
+
+type DataTileGrid struct {
+	Width  int
+	Height int
+	Tiles  [][]DataTileGridTile
+}
+
+type DataTileGridTile struct {
+	Id    uint32
+	FlipX bool
+	FlipY bool
+	FlipD bool
 }
 
 // The object group is in fact a map layer,
@@ -675,11 +834,25 @@ type Property struct {
 
 func ParseMapString(data string) (m *Map, err error) {
 	m = &Map{}
-	err = xml.Unmarshal([]byte(data), m)
+	if err = xml.Unmarshal([]byte(data), m); err != nil {
+		return
+	}
+	if err = m.afterDeserialize(); err != nil {
+		return
+	}
 	return
 }
 
 func (m *Map) Serialize() (str string, err error) {
-	err = fmt.Errorf("Not supported")
+	var (
+		bytes []byte
+	)
+	if err = m.beforeSerialize(); err != nil {
+		return
+	}
+	if bytes, err = xml.MarshalIndent(m, "", "  "); err != nil {
+		return
+	}
+	str = xml.Header + string(bytes)
 	return
 }
