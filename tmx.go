@@ -58,25 +58,25 @@ type Map struct {
 	BackgroundColor string `xml:"backgroundcolor,attr,omitempty"`
 
 	// Can contain properties.
-	Properties []Property `xml:"properties>property"`
+	Properties []*Property `xml:"properties>property"`
 
 	// Can contain tileset.
-	Tilesets []Tileset `xml:"tileset"`
+	Tilesets []*Tileset `xml:"tileset"`
 
 	// Can contain layer.
-	Layers []Layer `xml:"layer"`
+	Layers []*Layer `xml:"layer"`
 
 	// Can contain objectgroup.
-	ObjectGroups []ObjectGroup `xml:"objectgroup"`
+	ObjectGroups []*ObjectGroup `xml:"objectgroup"`
 
 	// Can contain imagelayer.
-	ImageLayers []ImageLayer `xml:"imagelayer"`
+	ImageLayers []*ImageLayer `xml:"imagelayer"`
 }
 
 func (m *Map) LayerByName(name string) (l *Layer, err error) {
 	for i := 0; i < len(m.Layers); i++ {
 		if m.Layers[i].Name == name {
-			l = &m.Layers[i]
+			l = m.Layers[i]
 			return
 		}
 	}
@@ -89,7 +89,7 @@ func (m *Map) LayerByIndex(index int32) (l *Layer, err error) {
 		err = fmt.Errorf("Index %v out of bounds", index)
 		return
 	}
-	l = &m.Layers[index]
+	l = m.Layers[index]
 	return
 }
 
@@ -210,7 +210,7 @@ func encodeGid(id uint32, fliph, flipv, flipd bool) (gid uint32) {
 }
 
 // The tilesets argument must first be sorted by firstgid.
-func newTile(gid uint32, tilesets []Tileset, tilebounds Bounds) (t *Tile, err error) {
+func newTile(gid uint32, tilesets []*Tileset, tilebounds Bounds) (t *Tile, err error) {
 	var (
 		tileset *Tileset
 		count   = len(tilesets)
@@ -226,12 +226,12 @@ func newTile(gid uint32, tilesets []Tileset, tilebounds Bounds) (t *Tile, err er
 	gid, fliph, flipv, flipd = parseGid(gid)
 	for i := 1; i < count; i++ {
 		if gid < tilesets[i].FirstGid {
-			tileset = &tilesets[i-1]
+			tileset = tilesets[i-1]
 			break
 		}
 	}
 	if tileset == nil {
-		tileset = &tilesets[count-1]
+		tileset = tilesets[count-1]
 	}
 	index = gid - tileset.FirstGid
 	t = &Tile{
@@ -265,7 +265,7 @@ func GetTexturePath(tiles []*Tile) (path string, err error) {
 }
 
 // Sorts Tilesets by FirstGid property.
-type byFirstGid []Tileset
+type byFirstGid []*Tileset
 
 func (b byFirstGid) Len() int           { return len(b) }
 func (b byFirstGid) Swap(i, j int)      { b[i], b[j] = b[j], b[i] }
@@ -434,11 +434,11 @@ type Layer struct {
 	Height int32 `xml:"height,attr"`
 
 	// The opacity of the layer as a value from 0 to 1. Defaults to 1.
-	opacity string `xml:"opacity,attr"`
+	RawOpacity string `xml:"opacity,attr,omitempty"`
 	Opacity float32 `xml:"-"`
 
 	// Whether the layer is shown (1) or hidden (0). Defaults to 1.
-	visible string `xml:"visible,attr"`
+	RawVisible string `xml:"visible,attr,omitempty"`
 	Visible bool `xml:"-"`
 
 	// Can contain properties.
@@ -448,21 +448,21 @@ type Layer struct {
 	Data *Data `xml:"data"`
 }
 
-func (l Layer) afterDeserialize() (err error) {
+func (l *Layer) afterDeserialize() (err error) {
 	var (
 		f float64
 		i int64
 	)
-	if l.opacity != "" {
-		if f, err = strconv.ParseFloat(l.opacity, 32); err != nil {
+	if strings.TrimSpace(l.RawOpacity) != "" {
+		if f, err = strconv.ParseFloat(l.RawOpacity, 32); err != nil {
 			return
 		}
 		l.Opacity = float32(f)
 	} else {
 		l.Opacity = 1.0
 	}
-	if l.visible != "" {
-		if i, err = strconv.ParseInt(l.visible, 10, 32); err != nil {
+	if strings.TrimSpace(l.RawVisible) != "" {
+		if i, err = strconv.ParseInt(l.RawVisible, 10, 32); err != nil {
 			return
 		}
 		l.Visible = (i > 0)
@@ -472,21 +472,33 @@ func (l Layer) afterDeserialize() (err error) {
 	return
 }
 
-func (l Layer) beforeSerialize() (err error) {
+func (l *Layer) beforeSerialize() (err error) {
 	var (
 		grid DataTileGrid
 	)
 	if l.Visible {
-		l.visible = "1"
+		l.RawVisible = "" // Defaults to true, so omit from output.
 	} else {
-		l.visible = "0"
+		l.RawVisible = "0"
 	}
-	l.opacity = strconv.FormatFloat(float64(l.Opacity), 'f', 10, 32)
-	if grid, err = l.Data.GetTileGrid(int(l.Width), int(l.Height)); err != nil {
+	if l.Opacity == 1.0 {
+		l.RawOpacity = "" // Defaults to 1.0, so omit from output.
+	} else {
+		l.RawOpacity = strconv.FormatFloat(float64(l.Opacity), 'f', -1, 32)
+	}
+	if grid, err = l.GetGrid(); err != nil {
 		return
 	}
-	err = l.Data.SetTileGrid(grid)
+	err = l.SetGrid(grid)
 	return
+}
+
+func (l *Layer) GetGrid() (DataTileGrid, error) {
+	return l.Data.GetTileGrid(int(l.Width), int(l.Height))
+}
+
+func (l *Layer) SetGrid(grid DataTileGrid) error {
+	return l.Data.SetTileGrid(grid)
 }
 
 // When no encoding or compression is given, the tiles are stored as

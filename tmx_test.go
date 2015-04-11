@@ -42,7 +42,7 @@ const TEST_MAP = `
    eJzt2MsKwjAQheEKvog7r4u+/8uZhQsrTh1wwtz+DwJdhJKeJs00ywL0dR7t5j2IoO6jPbwHEVSVbKzm//p2XSWb62gX43tWyWaGGXmjt/V3l5SO3gNASFbz3asuPij7ea5r9nAZ2WxVrItnIBsZdfFcp1f7V8WzJKtsPudwlvp1b5xW2VRUNZuKa9wKe7iMbLaoi3XIRpalLv52VsE+IsvyXhFbln+MCjp+z7TP3HEP137DO2azh7pYh2xk1E+I4glYsQ1i
   </data>
  </layer>
- <layer name="Stars" width="71" height="40">
+ <layer name="Stars" width="71" height="40" opacity="0.5" visible="0">
   <data encoding="base64" compression="zlib">
    eJztl1sOhTAIRN2auv89Gf9MbC0FLK85n1dvAjNTsNtGYyf+lpXDugBjLPof5av3nFNrdX+jIfELXv8HZyec6lWsI3KWqLpn2vOR/brheMHtecW5bNWWKW/WQEuQGeS7Hqt3+HMPIm+gCpHvZeBNa3ZFvw9VADtHj56WvVmHGegPynnAXPMPPAKrQeb84fn7Rrs2z71qk7FXSU8zsyejdtZQ9R+9x/XGytNsWaqyw73cPb/0pmYrumfZztAIrq8zOkkzIfm/l7MVGYqGFwJPD+s=
   </data>
@@ -70,7 +70,7 @@ const TEST_MAP_ENCODED = `
   <layer name="Tile Layer 3" width="71" height="40">
     <data encoding="base64" compression="zlib">eJzs2E0KAjEMxXEFL+LOz8Xc/3J24cIRUwImJE3+Pyi4EInPzvQ5B6Cxy1j36CGSeoz1jB4iqSrZWO3/7eN1lWxuY12NP7NKNh488kZvW/QATk7RAyAlq/0e1YuPyvdFXtec4TKy2avYiz2QjYxe7Ov8Xv+q+CzJKpvvPbxKf53NaZVNRVWzqXiNW+EMl5HNHr1Yh2xkq/TiX88qOEdkq/yuyG2V/xgVdLyfab9zxzNcew/vmM0MvViHbGT0J2TxCgAA//9YsQ1i</data>
   </layer>
-  <layer name="Stars" width="71" height="40">
+  <layer name="Stars" width="71" height="40" opacity="0.5" visible="0">
     <data encoding="base64" compression="zlib">eJzsl10SAjEIg72aev87Ob4549ZSQH5CvkfdnYEkhe1NyF34GyqP7AKSyeh/l6/V/5pap/vbDYtf9Pp/aHbC072KODpnSao70p7v7NcbjRfaniPO5VVtSHnLhloSZJjveUTv8M89yLyRKXS+l5FvrmZX9/vQBLhz/FhpuZp1nIH1kJwHzrX60CMSDTNXj8rfN961Ve7VG8ReLT2dzB5E7bKR6r97TutNlqdoWZqyw6vcPX/pLc1Wd8/QztAOra8nOlkzYXm/ytnqjETDVwAAAP//Ak8P6w==</data>
   </layer>
 </map>
@@ -106,11 +106,12 @@ const TEST_TILES_FROM_LAYER_MAP = `
 
 func TestParseGid(t *testing.T) {
 	var (
-		val uint32
-		fh  bool
-		fv  bool
-		fd  bool
-		id  uint32
+		val     uint32
+		fh      bool
+		fv      bool
+		fd      bool
+		id      uint32
+		encoded string
 	)
 	type testcase struct {
 		Input string
@@ -134,6 +135,35 @@ func TestParseGid(t *testing.T) {
 		if id != c.Id || fh != c.Fh || fv != c.Fv || fd != c.Fd {
 			t.Errorf("Gid parsed wrong: %v %v %v %v %v", id, fh, fv, fd, c)
 		}
+		encoded = fmt.Sprintf("%032b", encodeGid(id, fh, fv, fd))
+		if encoded != c.Input {
+			t.Errorf("Gid encoded wrong:\nGot    %v\nWanted %v", encoded, c.Input)
+		}
+	}
+}
+
+func TestLayer(t *testing.T) {
+	var (
+		m   *Map
+		err error
+	)
+	if m, err = ParseMapString(TEST_MAP); err != nil {
+		t.Errorf("Could not parse: %v", err)
+	}
+	if len(m.Layers) != 2 {
+		t.Errorf("Number of layers incorrect")
+	}
+	if m.Layers[0].Opacity != 1.0 {
+		t.Errorf("Default opacity incorrect")
+	}
+	if m.Layers[0].Visible != true {
+		t.Errorf("Default visibility incorrect")
+	}
+	if m.Layers[1].Opacity != 0.5 {
+		t.Errorf("Parsed opacity incorrect")
+	}
+	if m.Layers[1].Visible != false {
+		t.Errorf("Parsed visibility incorrect")
 	}
 }
 
@@ -317,17 +347,67 @@ func TestParseMapString(t *testing.T) {
 
 func TestMapSerialize(t *testing.T) {
 	var (
-		m          *Map
-		serialized string
-		err        error
+		mBefore      *Map
+		mBeforeLayer *Layer
+		mBeforeGrid  DataTileGrid
+		mAfter       *Map
+		mAfterLayer  *Layer
+		mAfterGrid   DataTileGrid
+		beforeTile   DataTileGridTile
+		afterTile    DataTileGridTile
+		serialized   string
+		err          error
 	)
-	if m, err = ParseMapString(TEST_MAP); err != nil {
+	if mBefore, err = ParseMapString(TEST_MAP); err != nil {
 		t.Fatalf("Could not parse: %v", err)
 	}
-	if serialized, err = m.Serialize(); err != nil {
+	if serialized, err = mBefore.Serialize(); err != nil {
 		t.Fatalf("Could not reserialize: %v", err)
 	}
 	if strings.TrimSpace(serialized) != strings.TrimSpace(TEST_MAP_ENCODED) {
 		t.Errorf("Serialized data did not match expected value!. Got \n%v", serialized)
+	}
+	if mAfter, err = ParseMapString(serialized); err != nil {
+		t.Fatalf("Could not parse reserialized map: %v", err)
+	}
+	if mBeforeLayer, err = mBefore.LayerByIndex(0); err != nil {
+		t.Fatalf("Problem getting before layer")
+	}
+	if mAfterLayer, err = mAfter.LayerByIndex(0); err != nil {
+		t.Fatalf("Problem getting after layer")
+	}
+	if mBeforeGrid, err = mBeforeLayer.GetGrid(); err != nil {
+		t.Fatalf("Problem getting before tile grid")
+	}
+	if mAfterGrid, err = mAfterLayer.GetGrid(); err != nil {
+		t.Fatalf("Problem getting after tile grid")
+	}
+	if mBeforeGrid.Width != mAfterGrid.Width {
+		t.Errorf("Widths don't match")
+	}
+	if mBeforeGrid.Height != mAfterGrid.Height {
+		t.Errorf("Heights don't match")
+	}
+	for y := 0; y < mBeforeGrid.Height; y++ {
+		for x := 0; x < mBeforeGrid.Width; x++ {
+			beforeTile = mBeforeGrid.Tiles[x][y]
+			afterTile = mAfterGrid.Tiles[x][y]
+			if beforeTile.Id != afterTile.Id {
+				t.Errorf("Tile IDs don't match at X:%v Y:%v Before:%v After:%v",
+					x, y, beforeTile.Id, afterTile.Id)
+			}
+			if beforeTile.FlipX != afterTile.FlipX {
+				t.Errorf("Tile FlipX don't match at X:%v Y:%v Before:%v After:%v",
+					x, y, beforeTile.FlipX, afterTile.FlipX)
+			}
+			if beforeTile.FlipY != afterTile.FlipY {
+				t.Errorf("Tile FlipY don't match at X:%v Y:%v Before:%v After:%v",
+					x, y, beforeTile.FlipY, afterTile.FlipY)
+			}
+			if beforeTile.FlipD != afterTile.FlipD {
+				t.Errorf("Tile FlipY don't match at X:%v Y:%v Before:%v After:%v",
+					x, y, beforeTile.FlipD, afterTile.FlipD)
+			}
+		}
 	}
 }
