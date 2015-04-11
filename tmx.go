@@ -678,3 +678,8 @@ func ParseMapString(data string) (m *Map, err error) {
 	err = xml.Unmarshal([]byte(data), m)
 	return
 }
+
+func (m *Map) Serialize() (str string, err error) {
+	err = fmt.Errorf("Not supported")
+	return
+}

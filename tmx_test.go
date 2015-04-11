@@ -287,3 +287,20 @@ func TestParseMapString(t *testing.T) {
 		t.Errorf("Invalid tile gid: %v", datatiles[9].Gid)
 	}
 }
+
+func TestMapSerialize(t *testing.T) {
+	var (
+		m          *Map
+		serialized string
+		err        error
+	)
+	if m, err = ParseMapString(TEST_MAP); err != nil {
+		t.Fatalf("Could not parse: %v", err)
+	}
+	if serialized, err = m.Serialize(); err != nil {
+		t.Fatalf("Could not reserialize: %v", err)
+	}
+	if serialized != TEST_MAP {
+		t.Errorf("Serialized data did not match expected value!. Got \n%v", serialized)
+	}
+}
