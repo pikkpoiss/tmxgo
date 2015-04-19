@@ -110,12 +110,16 @@ func (m *Map) TilesFromLayerIndex(index int32) (t []*Tile, err error) {
 }
 
 func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
-	var datatiles []DataTile
+	var (
+		datatiles []DataTile
+		j         int
+	)
 	if datatiles, err = layer.Data.Tiles(); err != nil {
 		return
 	}
 	sort.Sort(byFirstGid(m.Tilesets)) // Should be sorted but just in case.
 	t = make([]*Tile, len(datatiles))
+	j = 0
 	for i := 0; i < len(datatiles); i++ {
 		var (
 			tilebounds = Bounds{
@@ -128,12 +132,13 @@ func (m *Map) tilesFromLayer(layer *Layer) (t []*Tile, err error) {
 		)
 
 		if gid == 0 {
-			t[i] = nil
-		} else if t[i], err = newTile(gid, m.Tilesets, tilebounds); err != nil {
+			t[j] = nil
+		} else if t[j], err = newTile(gid, m.Tilesets, tilebounds); err != nil {
 			return
 		}
+		j++
 	}
-	return
+	return t[:j], nil
 }
 
 func (m *Map) afterDeserialize() (err error) {
@@ -434,12 +439,12 @@ type Layer struct {
 	Height int32 `xml:"height,attr"`
 
 	// The opacity of the layer as a value from 0 to 1. Defaults to 1.
-	RawOpacity string `xml:"opacity,attr,omitempty"`
-	Opacity float32 `xml:"-"`
+	RawOpacity string  `xml:"opacity,attr,omitempty"`
+	Opacity    float32 `xml:"-"`
 
 	// Whether the layer is shown (1) or hidden (0). Defaults to 1.
 	RawVisible string `xml:"visible,attr,omitempty"`
-	Visible bool `xml:"-"`
+	Visible    bool   `xml:"-"`
 
 	// Can contain properties.
 	Properties []Property `xml:"properties,omitempty>property"`
